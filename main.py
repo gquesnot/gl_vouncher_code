@@ -65,8 +65,6 @@ def producer():
 
 
     for a in choices:
-        if a == "0":
-            continue
         for b in choices:
             for c in choices:
                 for d in choices:
