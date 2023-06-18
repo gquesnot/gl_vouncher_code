@@ -58,12 +58,6 @@ def producer():
     letters = string.ascii_uppercase
     choices = digits
 
-    # generate list from 1 to 3 letters
-    # for i in range(1, 4):
-    #     for j in itertools.product(choices, repeat=i):
-    #         yield "".join(j)
-
-
     for a in choices:
         for b in choices:
             for c in choices:
